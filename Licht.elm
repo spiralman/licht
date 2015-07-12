@@ -3,25 +3,51 @@ import Html.Events exposing (onClick)
 import StartApp
 
 main =
-  StartApp.start { model = model, view = view, update = update }
+  StartApp.start { model = init, view = view, update = update }
 
-model = ["first", "second"]
 
+-- Model
+
+type alias AppState =
+  { nextID : Int
+  , layers : List ( ID, String )
+  }
+
+type alias ID = Int
+
+init : AppState
+init =
+  { layers = [(0, "one"), (1, "two")]
+  , nextID = 2
+  }
+
+
+-- Views
+
+view : Signal.Address Action -> AppState -> Html
 view address model =
-  ul []
-       (List.map (viewLayer address) model
-        ++ [ button [ onClick address Remove ] [ text "-" ]
-           , button [ onClick address Add ] [ text "+" ]
-           ]
-       )
+  div []
+        [ ul []
+             (List.map (viewLayer address) model.layers)
+        , button [ onClick address Add ] [ text "+" ]
+        ]
 
-viewLayer address layer =
+viewLayer : Signal.Address Action -> ( ID, String ) -> Html
+viewLayer address (id, layer) =
   li []
-     [ text layer ]
+     [ text layer
+     , button [ onClick address (Remove id) ] [ text "x" ] ]
 
-type Action = Add | Remove
 
+-- Actions
+
+type Action
+  = Add
+  | Remove ID
+
+update : Action -> AppState -> AppState
 update action model =
   case action of
-    Add-> model
-    Remove -> model
+    Add -> { model | layers <- model.layers ++ [(model.nextID, "another")]
+                   , nextID <- model.nextID + 1 }
+    Remove id -> { model | layers <- List.filter (\(layerID, _) -> layerID /= id) model.layers }
