@@ -50,4 +50,4 @@ update action model =
   case action of
     Add -> { model | layers <- model.layers ++ [(model.nextID, "another")]
                    , nextID <- model.nextID + 1 }
-    Remove id -> { model | layers <- List.filter (\(layerID, _) -> layerID /= id) model.layers }
+    Remove id -> { model | layers <- List.filter (\ (layerID, _) -> layerID /= id) model.layers }
