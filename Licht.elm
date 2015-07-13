@@ -1,6 +1,7 @@
 import Html exposing (..)
 import Html.Events exposing (onClick)
 import StartApp
+import Layer
 
 main =
   StartApp.start { model = init, view = view, update = update }
@@ -9,16 +10,14 @@ main =
 -- Model
 
 type alias AppState =
-  { nextID : Int
-  , layers : List ( ID, String )
+  { nextID : Layer.ID
+  , layers : List Layer.Layer
   }
-
-type alias ID = Int
 
 init : AppState
 init =
-  { layers = [(0, "one"), (1, "two")]
-  , nextID = 2
+  { layers = []
+  , nextID = 0
   }
 
 
@@ -32,22 +31,24 @@ view address model =
         , button [ onClick address Add ] [ text "+" ]
         ]
 
-viewLayer : Signal.Address Action -> ( ID, String ) -> Html
-viewLayer address (id, layer) =
-  li []
-     [ text layer
-     , button [ onClick address (Remove id) ] [ text "x" ] ]
-
+viewLayer : Signal.Address Action -> Layer.Layer -> Html
+viewLayer address layer =
+  let context =
+        Layer.Context
+             (Signal.forwardTo address Remove)
+  in
+    Layer.viewLayer context layer
 
 -- Actions
 
 type Action
   = Add
-  | Remove ID
+  | Remove Layer.ID
 
 update : Action -> AppState -> AppState
 update action model =
   case action of
-    Add -> { model | layers <- model.layers ++ [(model.nextID, "another")]
+    Add -> { model | layers <- model.layers ++ [{ id = model.nextID
+                                                , name = "another"}]
                    , nextID <- model.nextID + 1 }
-    Remove id -> { model | layers <- List.filter (\ (layerID, _) -> layerID /= id) model.layers }
+    Remove id -> { model | layers <- List.filter (\layer -> layer.id /= id) model.layers }
