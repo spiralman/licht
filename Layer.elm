@@ -29,19 +29,19 @@ newLayer id =
 
 viewLayer : Context -> Layer -> Html
 viewLayer context layer =
-  li [ onClick context.update (layer.id, Editing True)]
+  li [ onClick context.update (Editing True)]
      [ if layer.editing
        then input
               [ placeholder "Layer Name"
               , autofocus True
               , value layer.name
-              , on "input" targetValue (\v -> Signal.message context.update (layer.id, Rename v))
-              , onBlur context.update (layer.id, Editing False)
-              , onEnter context.update (layer.id, Editing False)
+              , on "input" targetValue (\v -> Signal.message context.update (Rename v))
+              , onBlur context.update (Editing False)
+              , onEnter context.update (Editing False)
               ]
               []
        else text layer.name
-     , button [ onClick context.remove layer.id ] [ text "x" ] ]
+     , button [ onClick context.remove () ] [ text "x" ] ]
 
 onEnter : Signal.Address a -> a -> Attribute
 onEnter address value =
@@ -61,8 +61,8 @@ type Action
   | Editing Bool
 
 type alias Context =
-  { update : Signal.Address (ID, Action)
-  , remove : Signal.Address ID
+  { update : Signal.Address Action
+  , remove : Signal.Address ()
   }
 
 updateLayer : Action -> Layer -> Layer

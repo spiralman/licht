@@ -36,8 +36,8 @@ viewLayer : Signal.Address Action -> Layer.Layer -> Html
 viewLayer address layer =
   let context =
         Layer.Context
-             (Signal.forwardTo address Update)
-             (Signal.forwardTo address Remove)
+             (Signal.forwardTo address (Update layer.id))
+             (Signal.forwardTo address (always (Remove layer.id)))
   in
     Layer.viewLayer context layer
 
@@ -45,7 +45,7 @@ viewLayer address layer =
 
 type Action
   = Add
-  | Update (Layer.ID, Layer.Action)
+  | Update Layer.ID Layer.Action
   | Remove Layer.ID
 
 update : Action -> AppState -> AppState
@@ -53,9 +53,9 @@ update action model =
   case action of
     Add -> { model | layers <- model.layers ++ [Layer.newLayer model.nextID]
                    , nextID <- model.nextID + 1 }
-    Update (id, action) -> { model | layers <- List.map (\layer ->
-                                                      if layer.id == id
-                                                      then Layer.updateLayer action layer
-                                                      else layer)
+    Update id action -> { model | layers <- List.map (\layer ->
+                                                        if layer.id == id
+                                                        then Layer.updateLayer action layer
+                                                        else layer)
                           model.layers }
     Remove id -> { model | layers <- List.filter (\layer -> layer.id /= id) model.layers }
