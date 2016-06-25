@@ -1,72 +1,37 @@
-module Layer where
+module Layer exposing ( Model, Msg, init, update, view )
 
 import Html exposing (..)
 import Html.Attributes exposing (..)
-import Html.Events exposing (onClick, on, targetValue, onBlur, keyCode)
-
-import Json.Decode as Json
+import Html.Events exposing (onClick)
 
 
 -- Model
 
-type alias Layer =
-  { id : ID
-  , name : String
-  , editing : Bool
+type alias Model =
+  { name : String
   }
 
-type alias ID = Int
-
-newLayer : ID -> Layer
-newLayer id =
-  { id = id
-  , name = ""
-  , editing = True
+init : String -> Model
+init layerName =
+  { name = layerName
   }
 
 
--- Views
+-- Update
 
-viewLayer : Context -> Layer -> Html
-viewLayer context layer =
-  li [ onClick context.update (Editing True)]
-     [ if layer.editing
-       then input
-              [ placeholder "Layer Name"
-              , autofocus True
-              , value layer.name
-              , on "input" targetValue (\v -> Signal.message context.update (Rename v))
-              , onBlur context.update (Editing False)
-              , onEnter context.update (Editing False)
-              ]
-              []
-       else text layer.name
-     , button [ onClick context.remove () ] [ text "x" ] ]
-
-onEnter : Signal.Address a -> a -> Attribute
-onEnter address value =
-  on "keydown"
-       (Json.customDecoder keyCode is13)
-       (\_ -> Signal.message address value)
-
-is13 : Int -> Result String ()
-is13 code =
-  if code == 13 then Ok () else Err "not the right key code"
-
-
--- Actions
-
-type Action
+type Msg
   = Rename String
-  | Editing Bool
 
-type alias Context =
-  { update : Signal.Address Action
-  , remove : Signal.Address ()
-  }
+update : Msg -> Model -> Model
+update msg model =
+  case msg of
+      Rename newName ->
+        { model | name = newName }
 
-updateLayer : Action -> Layer -> Layer
-updateLayer action layer =
-  case action of
-    Rename name -> { layer | name <- name }
-    Editing editing -> { layer | editing <- editing }
+
+-- View
+
+view : Model -> Html Msg
+view model =
+  div []
+    [ text model.name ]
