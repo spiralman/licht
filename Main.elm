@@ -43,7 +43,7 @@ update msg ({layers, nextUid} as model) =
         { model
           | layers = layers ++ [ IndexedLayer
                                    nextUid
-                                   (Layer.init ("Layer " ++ (toString nextUid)))
+                                   (Layer.init ("Layer " ++ toString nextUid))
                                ]
           , nextUid = nextUid + 1
         }
