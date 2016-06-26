@@ -2,6 +2,7 @@ import Html exposing (..)
 import Html.App as App
 import Html.Attributes exposing (..)
 import Html.Events exposing (onClick)
+import Task
 
 import Layer
 import Viewer
@@ -30,11 +31,14 @@ type alias IndexedLayer =
 
 init : (Model, Cmd Msg)
 init =
-  ( { layers = []
-    , viewDesc = Viewer.init
-    , nextUid = 0
-    }
-  , Cmd.none)
+  let
+    (viewModel, viewCmd) = Viewer.init
+  in
+      ( { layers = []
+        , viewDesc = viewModel
+        , nextUid = 0
+        }
+      , Cmd.map ModifyView viewCmd)
 
 
 -- Update
