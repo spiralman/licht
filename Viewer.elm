@@ -4,6 +4,8 @@ import AnimationFrame
 import Debug exposing (log)
 import Html exposing (Html)
 import Html.Attributes exposing ( width, height )
+import Html.Events exposing ( onWithOptions, defaultOptions )
+import Json.Decode exposing ((:=))
 import Math.Matrix4 exposing (..)
 import Math.Vector2 exposing (..)
 import Math.Vector3 exposing (..)
@@ -16,6 +18,12 @@ import Window
 
 -- Model
 
+type alias ScrollEvent =
+  { deltaX : Float
+  , deltaY : Float
+  , deltaZ : Float
+  }
+
 type alias Center = { x : Float, y : Float }
 
 type alias Model =
@@ -25,6 +33,7 @@ type alias Model =
   , dragStart : Mouse.Position
   , posStart : Center
   , size : Window.Size
+  , scale : Float
   }
 
 init : (Model, Cmd Msg)
@@ -35,6 +44,7 @@ init =
     , dragStart = { x = 0, y = 0 }
     , posStart = { x = 0, y = 0 }
     , size = { width = 0, height = 0 }
+    , scale = 4
     }
   , Task.perform (always Resize (0, 0)) Resize Window.size
   )
@@ -49,6 +59,7 @@ type Msg
   | DragStart Mouse.Position
   | DragStop Mouse.Position
   | Resize Window.Size
+  | ChangeZoom ScrollEvent
 
 
 update : Msg -> Model -> Model
@@ -75,6 +86,8 @@ update msg model =
         { model | dragging = False }
       Resize newSize ->
         { model | size = newSize }
+      ChangeZoom scroll ->
+        { model | scale = model.scale + (scroll.deltaY * 0.01) }
 
 
 newCenter : Model -> Mouse.Position -> Center
@@ -82,7 +95,7 @@ newCenter model {x, y} =
   let
     dx = toFloat (model.dragStart.x - x)
     dy = toFloat (model.dragStart.y - y)
-    scale = 4 / toFloat model.size.height
+    scale = model.scale / toFloat model.size.height
     dx' = dx * scale
     dy' = dy * scale
   in
@@ -113,26 +126,43 @@ mesh =
     , Vertex (vec3 1 1 0) (vec3 1 0 0)
     ]
 
-perspective : Center -> Window.Size -> Mat4
-perspective center size =
+perspective : Center -> Float -> Window.Size -> Mat4
+perspective center scale size =
   let
     w = toFloat size.width
     h = toFloat size.height
     a = w / h
+    halfScale = scale / 2
   in
       List.foldr mul Math.Matrix4.identity
-        [ makeOrtho2D (-2 * a) (2 * a) -2 2
+        [ makeOrtho2D (-halfScale * a) (halfScale * a) -halfScale halfScale
         , makeLookAt (vec3 center.x center.y 0) (vec3 center.x center.y 1) (vec3 0 1 0)
         ]
 
 view : Model -> Html Msg
 view model =
-  WebGL.toHtml [ width model.size.width, height model.size.height ]
+  WebGL.toHtml [ width model.size.width
+               , height model.size.height
+               , onWheel ChangeZoom
+               ]
     [ render
         vertexShader
         fragmentShader
         mesh
-        { perspective = perspective model.centerPos model.size } ]
+        { perspective = perspective model.centerPos model.scale model.size } ]
+
+onWheel : (ScrollEvent -> msg) -> Html.Attribute msg
+onWheel tagger =
+  onWithOptions "wheel"
+    { defaultOptions | preventDefault = True }
+    (Json.Decode.map tagger decodeWheel)
+
+decodeWheel : Json.Decode.Decoder ScrollEvent
+decodeWheel =
+  Json.Decode.object3 ScrollEvent
+    ("deltaX" := Json.Decode.float)
+    ("deltaY" := Json.Decode.float)
+    ("deltaZ" := Json.Decode.float)
 
 vertexShader : Shader { attr | position : Vec3, color : Vec3 } { u | perspective : Mat4 } { vcolor : Vec3 }
 vertexShader =
