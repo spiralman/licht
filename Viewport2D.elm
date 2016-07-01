@@ -114,7 +114,7 @@ perspective center scale size =
         , makeLookAt (vec3 center.x center.y 0) (vec3 center.x center.y 1) (vec3 0 1 0)
         ]
 
-view : List ({ perspective : Mat4} -> Renderable) -> Model -> Html Msg
+view : List (Mat4 -> Renderable) -> Model -> Html Msg
 view renderers model =
   WebGL.toHtml [ width model.size.width
                , height model.size.height
@@ -122,7 +122,7 @@ view renderers model =
                ]
     (List.map
        (\renderer ->
-          renderer { perspective = perspective model.centerPos model.scale model.size })
+          renderer (perspective model.centerPos model.scale model.size) )
        renderers)
 
 onWheel : (ScrollEvent -> msg) -> Html.Attribute msg

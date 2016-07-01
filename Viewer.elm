@@ -3,7 +3,9 @@ module Viewer exposing ( Model, Msg, init, update, view, subscriptions )
 import Html exposing (Html)
 import Html.App as App
 import Math.Matrix4 exposing (..)
+import Math.Vector2 exposing (..)
 import Math.Vector3 exposing (..)
+import Task
 import Viewport2D
 import WebGL exposing (..)
 
@@ -12,6 +14,7 @@ import WebGL exposing (..)
 type alias Model =
   { imageUrl : String
   , viewport : Viewport2D.Model
+  , texture : Maybe Texture
   }
 
 init : (Model, Cmd Msg)
@@ -21,8 +24,13 @@ init =
   in
     ( { imageUrl = ""
       , viewport = viewportModel
+      , texture = Nothing
       }
-    , Cmd.map ModifyViewport viewportCmd
+    , Cmd.batch
+      [ Cmd.map ModifyViewport viewportCmd
+      , loadTexture "/images/flower.png"
+        |> Task.perform TextureError TextureLoaded
+      ]
     )
 
 
@@ -31,6 +39,8 @@ init =
 type Msg
   = ChangeImageUrl String
   | ModifyViewport Viewport2D.Msg
+  | TextureError Error
+  | TextureLoaded Texture
 
 
 update : Msg -> Model -> Model
@@ -38,6 +48,10 @@ update msg model =
   case msg of
       ChangeImageUrl newUrl ->
         { model | imageUrl = newUrl }
+      TextureError err ->
+        model
+      TextureLoaded texture ->
+        { model | texture = Just texture }
       ModifyViewport msg ->
         { model | viewport = Viewport2D.update msg model.viewport }
 
@@ -49,47 +63,60 @@ subscriptions model =
 
 -- View
 
-type alias Vertex = { position : Vec3, color : Vec3 }
+type alias Vertex = { position : Vec3, coord : Vec3 }
 
 mesh : Drawable Vertex
 mesh =
   TriangleFan
-    [ Vertex (vec3 -1 1 0) (vec3 1 0 0)
-    , Vertex (vec3 -1 -1 0) (vec3 1 0 0)
+    [ Vertex (vec3 -1 1 0) (vec3 0 1 0)
+    , Vertex (vec3 -1 -1 0) (vec3 0 0 0)
     , Vertex (vec3 1 -1 0) (vec3 1 0 0)
-    , Vertex (vec3 1 1 0) (vec3 1 0 0)
+    , Vertex (vec3 1 1 0) (vec3 1 1 0)
     ]
 
 view : Model -> Html Msg
-view model =
+view {texture, viewport} =
   App.map ModifyViewport
-    (Viewport2D.view [
-        WebGL.render vertexShader fragmentShader mesh
-       ]
-       model.viewport)
+    (Viewport2D.view
+       (case texture of
+            Nothing ->
+              []
+            Just tex ->
+              [
+               \perspective ->
+                 WebGL.render
+                   vertexShader
+                   fragmentShader
+                   mesh
+                   { perspective = perspective
+                   , image = tex }
+              ]
+          )
+     viewport)
 
 
-vertexShader : Shader { attr | position : Vec3, color : Vec3 } { u | perspective : Mat4 } { vcolor : Vec3 }
+vertexShader : Shader { attr | position : Vec3, coord : Vec3 } { u | perspective : Mat4 } { vcoord : Vec2 }
 vertexShader =
   [glsl|
 
      attribute vec3 position;
-     attribute vec3 color;
+     attribute vec3 coord;
      uniform mat4 perspective;
-     varying vec3 vcolor;
+     varying vec2 vcoord;
 
      void main() {
            gl_Position = perspective * vec4(position, 1.0);
-           vcolor = color;
+           vcoord = coord.xy;
      }
   |]
 
-fragmentShader : Shader {} u { vcolor : Vec3 }
+fragmentShader : Shader {} { u | image : Texture } { vcoord : Vec2 }
 fragmentShader =
   [glsl|
      precision mediump float;
-     varying vec3 vcolor;
+     uniform sampler2D image;
+     varying vec2 vcoord;
      void main() {
-           gl_FragColor = vec4(vcolor, 1.0);
+           gl_FragColor = texture2D(image, vcoord);
      }
   |]
