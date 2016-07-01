@@ -1,6 +1,5 @@
 module Viewport2D exposing ( Model, Msg, init, update, view, subscriptions )
 
-import AnimationFrame
 import Html exposing (Html)
 import Html.Attributes exposing ( width, height )
 import Html.Events exposing ( onWithOptions, defaultOptions )
@@ -9,7 +8,6 @@ import Math.Matrix4 exposing (..)
 import Math.Vector3 exposing (..)
 import Mouse
 import Task
-import Time exposing (Time)
 import WebGL exposing (..)
 import Window
 
@@ -48,8 +46,7 @@ init =
 -- Update
 
 type Msg
-  = Tick Time
-  | PosChange Mouse.Position
+  = PosChange Mouse.Position
   | DragStart Mouse.Position
   | DragStop Mouse.Position
   | Resize Window.Size
@@ -59,8 +56,6 @@ type Msg
 update : Msg -> Model -> Model
 update msg model =
   case msg of
-      Tick elapsed ->
-        model
       PosChange pos ->
         { model
           | centerPos =
@@ -98,8 +93,7 @@ newCenter model {x, y} =
 subscriptions : Model -> Sub Msg
 subscriptions model =
   Sub.batch
-    [ AnimationFrame.diffs Tick
-    , Mouse.moves PosChange
+    [ Mouse.moves PosChange
     , Mouse.downs DragStart
     , Mouse.ups DragStop
     , Window.resizes Resize
