@@ -69,7 +69,10 @@ update msg ({layers, nextUid} as model) =
         ({ model | layers = List.map (updateIndexed id msg) layers }, Cmd.none)
 
       ModifyView msg ->
-        ({ model | viewDesc = Viewer.update msg model.viewDesc }, Cmd.none)
+        let
+          (viewDesc, viewCmd) = Viewer.update msg model.viewDesc
+        in
+            ({ model | viewDesc = viewDesc }, Cmd.map ModifyView viewCmd)
 
 updateIndexed : Int -> Layer.Msg -> IndexedLayer -> IndexedLayer
 updateIndexed targetId msg {id, model} =

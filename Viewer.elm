@@ -1,4 +1,4 @@
-module Viewer exposing ( Model, Msg, init, update, view, subscriptions )
+port module Viewer exposing ( Model, Msg, init, update, view, subscriptions, loadImage, imageLoaded )
 
 import Html exposing (Html)
 import Html.App as App
@@ -28,8 +28,7 @@ init =
       }
     , Cmd.batch
       [ Cmd.map ModifyViewport viewportCmd
-      , loadTexture "/images/flower.png"
-        |> Task.perform TextureError TextureLoaded
+      , loadImage "/images/flower.png"
       ]
     )
 
@@ -41,24 +40,33 @@ type Msg
   | ModifyViewport Viewport2D.Msg
   | TextureError Error
   | TextureLoaded Texture
+  | ImageLoaded String
 
+port loadImage : String -> Cmd msg
 
-update : Msg -> Model -> Model
+update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
   case msg of
       ChangeImageUrl newUrl ->
-        { model | imageUrl = newUrl }
+        ({ model | imageUrl = newUrl }, Cmd.none)
       TextureError err ->
-        model
+        (model, Cmd.none)
       TextureLoaded texture ->
-        { model | texture = Just texture }
+        ({ model | texture = Just texture }, Cmd.none)
       ModifyViewport msg ->
-        { model | viewport = Viewport2D.update msg model.viewport }
+        ({ model | viewport = Viewport2D.update msg model.viewport }, Cmd.none)
+      ImageLoaded url ->
+        ({ model | imageUrl = url }
+        , loadTexture url
+        |> Task.perform TextureError TextureLoaded)
+
+port imageLoaded : (String -> msg) -> Sub msg
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
   Sub.batch
     [ Sub.map ModifyViewport (Viewport2D.subscriptions model.viewport)
+    , imageLoaded ImageLoaded
     ]
 
 -- View
@@ -68,10 +76,10 @@ type alias Vertex = { position : Vec3, coord : Vec3 }
 mesh : Drawable Vertex
 mesh =
   TriangleFan
-    [ Vertex (vec3 -1 1 0) (vec3 0 1 0)
-    , Vertex (vec3 -1 -1 0) (vec3 0 0 0)
-    , Vertex (vec3 1 -1 0) (vec3 1 0 0)
-    , Vertex (vec3 1 1 0) (vec3 1 1 0)
+    [ Vertex (vec3 -1 1 0) (vec3 1 1 0)
+    , Vertex (vec3 -1 -1 0) (vec3 1 0 0)
+    , Vertex (vec3 1 -1 0) (vec3 0 0 0)
+    , Vertex (vec3 1 1 0) (vec3 0 1 0)
     ]
 
 view : Model -> Html Msg
