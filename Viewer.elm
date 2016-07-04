@@ -11,6 +11,13 @@ import WebGL exposing (..)
 
 -- Model
 
+type alias Vertex = { position : Vec3, coord : Vec3 }
+
+type alias Tile =
+  { vertices : ( Vertex, Vertex, Vertex, Vertex )
+  , texture : Texture
+  }
+
 type alias Model =
   { imageUrl : String
   , viewport : Viewport2D.Model
@@ -35,12 +42,18 @@ init =
 
 -- Update
 
+type alias ImageTiles =
+  { width : Int
+  , height : Int
+  , urls : List String
+  }
+
 type Msg
   = ChangeImageUrl String
   | ModifyViewport Viewport2D.Msg
   | TextureError Error
   | TextureLoaded Texture
-  | ImageLoaded String
+  | ImageLoaded ImageTiles
 
 port loadImage : String -> Cmd msg
 
@@ -55,12 +68,16 @@ update msg model =
         ({ model | texture = Just texture }, Cmd.none)
       ModifyViewport msg ->
         ({ model | viewport = Viewport2D.update msg model.viewport }, Cmd.none)
-      ImageLoaded url ->
-        ({ model | imageUrl = url }
-        , loadTexture url
-        |> Task.perform TextureError TextureLoaded)
+      ImageLoaded { width, height, urls } ->
+        case List.head urls of
+            Just url ->
+              ({ model | imageUrl = url }
+              , loadTexture url
+              |> Task.perform TextureError TextureLoaded)
+            Nothing ->
+              (model, Cmd.none)
 
-port imageLoaded : (String -> msg) -> Sub msg
+port imageLoaded : (ImageTiles -> msg) -> Sub msg
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
@@ -70,8 +87,6 @@ subscriptions model =
     ]
 
 -- View
-
-type alias Vertex = { position : Vec3, coord : Vec3 }
 
 mesh : Drawable Vertex
 mesh =
