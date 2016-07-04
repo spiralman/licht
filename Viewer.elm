@@ -14,14 +14,14 @@ import WebGL exposing (..)
 type alias Vertex = { position : Vec3, coord : Vec3 }
 
 type alias Tile =
-  { vertices : ( Vertex, Vertex, Vertex, Vertex )
+  { mesh : Drawable Vertex
   , texture : Texture
   }
 
 type alias Model =
   { imageUrl : String
   , viewport : Viewport2D.Model
-  , texture : Maybe Texture
+  , tiles : List Tile
   }
 
 init : (Model, Cmd Msg)
@@ -31,7 +31,7 @@ init =
   in
     ( { imageUrl = ""
       , viewport = viewportModel
-      , texture = Nothing
+      , tiles = []
       }
     , Cmd.batch
       [ Cmd.map ModifyViewport viewportCmd
@@ -42,18 +42,18 @@ init =
 
 -- Update
 
-type alias ImageTiles =
-  { width : Int
-  , height : Int
-  , urls : List String
+type alias ImageTile =
+  { x : Float
+  , y : Float
+  , url : String
   }
 
 type Msg
   = ChangeImageUrl String
   | ModifyViewport Viewport2D.Msg
   | TextureError Error
-  | TextureLoaded Texture
-  | ImageLoaded ImageTiles
+  | TextureLoaded Float Float Texture
+  | ImageLoaded (List ImageTile)
 
 port loadImage : String -> Cmd msg
 
@@ -64,20 +64,20 @@ update msg model =
         ({ model | imageUrl = newUrl }, Cmd.none)
       TextureError err ->
         (model, Cmd.none)
-      TextureLoaded texture ->
-        ({ model | texture = Just texture }, Cmd.none)
+      TextureLoaded x y texture ->
+        ({ model | tiles = (tile x y texture) :: model.tiles }, Cmd.none)
       ModifyViewport msg ->
         ({ model | viewport = Viewport2D.update msg model.viewport }, Cmd.none)
-      ImageLoaded { width, height, urls } ->
-        case List.head urls of
-            Just url ->
-              ({ model | imageUrl = url }
-              , loadTexture url
-              |> Task.perform TextureError TextureLoaded)
-            Nothing ->
-              (model, Cmd.none)
+      ImageLoaded tiles ->
+        ( model
+        , Cmd.batch
+            (List.map
+               (\tile -> loadTexture tile.url |> Task.perform TextureError (TextureLoaded tile.x tile.y))
+               tiles
+            )
+        )
 
-port imageLoaded : (ImageTiles -> msg) -> Sub msg
+port imageLoaded : ((List ImageTile) -> msg) -> Sub msg
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
@@ -88,34 +88,49 @@ subscriptions model =
 
 -- View
 
-mesh : Drawable Vertex
-mesh =
-  TriangleFan
-    [ Vertex (vec3 -1 1 0) (vec3 1 1 0)
-    , Vertex (vec3 -1 -1 0) (vec3 1 0 0)
-    , Vertex (vec3 1 -1 0) (vec3 0 0 0)
-    , Vertex (vec3 1 1 0) (vec3 0 1 0)
-    ]
+    -- [ Vertex (vec3 0 1 0) (vec3 1 1 0)
+    -- , Vertex (vec3 0 0 0) (vec3 1 0 0)
+    -- , Vertex (vec3 1 0 0) (vec3 0 0 0)
+    -- , Vertex (vec3 1 1 0) (vec3 0 1 0)
+
+tile : Float -> Float -> Texture -> Tile
+tile x y texture =
+  let
+    x' = -(x / 2048)
+    y' = -(y / 2048)
+    r = x' + 1
+    t = y' - 1
+  in
+      { mesh =
+          TriangleFan
+          [ Vertex (vec3 x' t 0) (vec3 1 0 0)
+          , Vertex (vec3 x' y' 0) (vec3 1 1 0)
+          , Vertex (vec3 r y' 0) (vec3 0 1 0)
+          , Vertex (vec3 r t 0) (vec3 0 0 0)
+          ]
+      , texture = texture
+      }
 
 view : Model -> Html Msg
-view {texture, viewport} =
+view {viewport, tiles} =
   App.map ModifyViewport
     (Viewport2D.view
-       (case texture of
-            Nothing ->
-              []
-            Just tex ->
-              [
-               \perspective ->
-                 WebGL.render
-                   vertexShader
-                   fragmentShader
-                   mesh
-                   { perspective = perspective
-                   , image = tex }
-              ]
+       (List.map
+          (\tile ->
+             (\perspective ->
+                WebGL.render
+                  vertexShader
+                  fragmentShader
+                  tile.mesh
+                  { perspective = perspective
+                  , image = tile.texture
+                  }
+             )
           )
-     viewport)
+          tiles
+       )
+       viewport
+    )
 
 
 vertexShader : Shader { attr | position : Vec3, coord : Vec3 } { u | perspective : Mat4 } { vcoord : Vec2 }

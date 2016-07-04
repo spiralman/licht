@@ -9,24 +9,26 @@
       images[url] = image;
 
       image.addEventListener("load", function(e) {
-        var urls = [];
+        var tiles = [];
         var x = 0;
         var y = 0;
 
         while (y < image.height) {
           while (x < image.width) {
-            urls.push(_renderImageAt(image, x, y));
+            tiles.push({
+              x: x,
+              y: y,
+              url: _renderImageAt(image, x, y)
+            });
 
             x += 2048;
           }
 
           y += 2048;
+          x = 0;
         }
-        app.ports.imageLoaded.send({
-          width: image.width,
-          height: image.height,
-          urls: urls
-        });
+        console.log('sending', tiles);
+        app.ports.imageLoaded.send(tiles);
       });
 
       image.src = url;
